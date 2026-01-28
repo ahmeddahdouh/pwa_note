@@ -181,6 +181,22 @@ function App() {
     const [isDBReady, setIsDBReady] = useState(false);
     const [showInstallPrompt, setShowInstallPrompt] = useState(false);
     const [stats, setStats] = useState({ total: 0, today: 0 });
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    const [showSidebar, setShowSidebar] = useState(window.innerWidth > 768);
+
+    // Détecter le redimensionnement de la fenêtre
+    useEffect(() => {
+        const handleResize = () => {
+            const mobile = window.innerWidth <= 768;
+            setIsMobile(mobile);
+            if (!mobile) {
+                setShowSidebar(true);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Initialiser IndexedDB au démarrage
     useEffect(() => {
@@ -247,6 +263,11 @@ function App() {
             const allNotes = await notesDB.getAllNotes();
             const createdNote = allNotes.find(n => n.id === id);
             setSelectedNote(createdNote);
+            
+            // Sur mobile, fermer la sidebar après création
+            if (isMobile) {
+                setShowSidebar(false);
+            }
         } catch (error) {
             console.error('Erreur création note:', error);
         }
@@ -338,6 +359,20 @@ function App() {
         return colors[Math.floor(Math.random() * colors.length)];
     };
 
+    const handleSelectNote = (note) => {
+        setSelectedNote(note);
+        if (isMobile) {
+            setShowSidebar(false);
+        }
+    };
+
+    const handleBackToList = () => {
+        setShowSidebar(true);
+        if (isMobile) {
+            setSelectedNote(null);
+        }
+    };
+
     if (!isDBReady) {
         return (
             <div style={styles.loading}>
@@ -355,101 +390,145 @@ function App() {
                 searchTerm={searchTerm}
                 showInstallPrompt={showInstallPrompt}
                 onInstall={installPWA}
+                isMobile={isMobile}
+                showSidebar={showSidebar}
+                onToggleSidebar={() => setShowSidebar(!showSidebar)}
             />
             
             <div style={styles.container}>
-                <Sidebar 
-                    notes={notes}
-                    selectedNote={selectedNote}
-                    onSelectNote={setSelectedNote}
-                    onCreateNote={createNote}
-                    onDeleteNote={deleteNote}
-                />
+                {(showSidebar || !isMobile) && (
+                    <Sidebar 
+                        notes={notes}
+                        selectedNote={selectedNote}
+                        onSelectNote={handleSelectNote}
+                        onCreateNote={createNote}
+                        onDeleteNote={deleteNote}
+                        isMobile={isMobile}
+                        onClose={() => setShowSidebar(false)}
+                    />
+                )}
                 
-                <Editor 
-                    note={selectedNote}
-                    onUpdate={updateNote}
-                />
+                {(!isMobile || (isMobile && !showSidebar)) && (
+                    <Editor 
+                        note={selectedNote}
+                        onUpdate={updateNote}
+                        isMobile={isMobile}
+                        onBack={handleBackToList}
+                    />
+                )}
             </div>
         </div>
     );
 }
 
 // Composant Header
-function Header({ isOnline, stats, onSearch, searchTerm, showInstallPrompt, onInstall }) {
+function Header({ isOnline, stats, onSearch, searchTerm, showInstallPrompt, onInstall, isMobile, showSidebar, onToggleSidebar }) {
     return (
         <header style={styles.header}>
             <div style={styles.headerLeft}>
-                <h1 style={styles.logo}>
-                    <span style={styles.logoIcon}>📝</span>
-                    NotesFlow
+                {isMobile && (
+                    <button 
+                        onClick={onToggleSidebar}
+                        style={styles.hamburger}
+                        aria-label="Toggle menu"
+                    >
+                        {showSidebar ? '✕' : '☰'}
+                    </button>
+                )}
+                <h1 style={{...styles.logo, fontSize: isMobile ? '1.3rem' : '1.8rem'}}>
+                    <span style={styles.logoIcon}>{isMobile ? '📝' : '📝'}</span>
+                    {!isMobile && 'NotesFlow'}
                 </h1>
-                <div style={styles.statusBadge}>
-                    <span style={{
-                        ...styles.statusDot,
-                        backgroundColor: isOnline ? '#2ecc71' : '#e74c3c'
-                    }} />
-                    {isOnline ? 'En ligne' : 'Hors ligne'}
-                </div>
+                {!isMobile && (
+                    <div style={styles.statusBadge}>
+                        <span style={{
+                            ...styles.statusDot,
+                            backgroundColor: isOnline ? '#2ecc71' : '#e74c3c'
+                        }} />
+                        {isOnline ? 'En ligne' : 'Hors ligne'}
+                    </div>
+                )}
             </div>
             
-            <div style={styles.headerCenter}>
-                <input 
-                    type="text"
-                    placeholder="🔍 Rechercher..."
-                    value={searchTerm}
-                    onChange={(e) => onSearch(e.target.value)}
-                    style={styles.searchInput}
-                />
-            </div>
+            {!isMobile && (
+                <div style={styles.headerCenter}>
+                    <input 
+                        type="text"
+                        placeholder="🔍 Rechercher..."
+                        value={searchTerm}
+                        onChange={(e) => onSearch(e.target.value)}
+                        style={styles.searchInput}
+                    />
+                </div>
+            )}
             
             <div style={styles.headerRight}>
-                <div style={styles.stats}>
-                    <div style={styles.statItem}>
-                        <span style={styles.statValue}>{stats.total}</span>
-                        <span style={styles.statLabel}>notes</span>
+                {!isMobile && (
+                    <div style={styles.stats}>
+                        <div style={styles.statItem}>
+                            <span style={styles.statValue}>{stats.total}</span>
+                            <span style={styles.statLabel}>notes</span>
+                        </div>
+                        <div style={styles.statDivider} />
+                        <div style={styles.statItem}>
+                            <span style={styles.statValue}>{stats.today}</span>
+                            <span style={styles.statLabel}>aujourd'hui</span>
+                        </div>
                     </div>
-                    <div style={styles.statDivider} />
-                    <div style={styles.statItem}>
-                        <span style={styles.statValue}>{stats.today}</span>
-                        <span style={styles.statLabel}>aujourd'hui</span>
-                    </div>
-                </div>
+                )}
                 
                 {showInstallPrompt && (
-                    <button onClick={onInstall} style={styles.installButton}>
-                        📲 Installer
+                    <button onClick={onInstall} style={{...styles.installButton, fontSize: isMobile ? '0.8rem' : '0.9rem', padding: isMobile ? '0.5rem 0.8rem' : '0.6rem 1.2rem'}}>
+                        {isMobile ? '📲' : '📲 Installer'}
                     </button>
                 )}
                 
-                <button 
-                    onClick={() => {
-                        console.log('=== DEBUG PWA ===');
-                        console.log('deferredPrompt disponible:', !!window.deferredPrompt);
-                        console.log('Service Worker enregistré:', 'serviceWorker' in navigator);
-                        console.log('HTTPS actif:', window.location.protocol === 'https:' || window.location.hostname === 'localhost');
-                        console.log('showInstallPrompt:', showInstallPrompt);
-                        if (!window.deferredPrompt) {
-                            alert('❌ Prompt d\'installation non disponible.\n\nRaisons possibles:\n- L\'app est déjà installée\n- Vous n\'êtes pas sur HTTPS/localhost\n- Le navigateur ne supporte pas l\'installation\n- Les critères PWA ne sont pas remplis');
-                        } else {
-                            alert('✅ Prompt d\'installation disponible!\nCliquez sur le bouton "📲 Installer"');
-                        }
-                    }}
-                    style={{...styles.installButton, background: '#16213e', marginLeft: '0.5rem'}}
-                    title="Vérifier le statut d'installation"
-                >
-                    🔍 Debug
-                </button>
+                {!isMobile && (
+                    <button 
+                        onClick={() => {
+                            console.log('=== DEBUG PWA ===');
+                            console.log('deferredPrompt disponible:', !!window.deferredPrompt);
+                            console.log('Service Worker enregistré:', 'serviceWorker' in navigator);
+                            console.log('HTTPS actif:', window.location.protocol === 'https:' || window.location.hostname === 'localhost');
+                            console.log('showInstallPrompt:', showInstallPrompt);
+                            if (!window.deferredPrompt) {
+                                alert('❌ Prompt d\'installation non disponible.\n\nRaisons possibles:\n- L\'app est déjà installée\n- Vous n\'êtes pas sur HTTPS/localhost\n- Le navigateur ne supporte pas l\'installation\n- Les critères PWA ne sont pas remplis');
+                            } else {
+                                alert('✅ Prompt d\'installation disponible!\nCliquez sur le bouton "📲 Installer"');
+                            }
+                        }}
+                        style={{...styles.installButton, background: '#16213e', marginLeft: '0.5rem'}}
+                        title="Vérifier le statut d'installation"
+                    >
+                        🔍 Debug
+                    </button>
+                )}
             </div>
         </header>
     );
 }
 
 // Composant Sidebar
-function Sidebar({ notes, selectedNote, onSelectNote, onCreateNote, onDeleteNote }) {
+function Sidebar({ notes, selectedNote, onSelectNote, onCreateNote, onDeleteNote, isMobile, onClose }) {
     return (
-        <aside style={styles.sidebar}>
-            <button onClick={onCreateNote} style={styles.createButton}>
+        <aside style={{
+            ...styles.sidebar,
+            width: isMobile ? '100%' : '350px',
+            position: isMobile ? 'fixed' : 'relative',
+            zIndex: isMobile ? 100 : 1,
+            height: isMobile ? '100vh' : 'auto'
+        }}>
+            {isMobile && (
+                <div style={styles.sidebarHeader}>
+                    <h2 style={styles.sidebarTitle}>Mes Notes</h2>
+                    <button onClick={onClose} style={styles.closeButton}>✕</button>
+                </div>
+            )}
+            
+            <button onClick={onCreateNote} style={{
+                ...styles.createButton,
+                margin: isMobile ? '1rem' : '1.5rem'
+            }}>
                 ✚ Nouvelle Note
             </button>
             
@@ -531,7 +610,7 @@ function NoteCard({ note, isSelected, onSelect, onDelete }) {
 }
 
 // Composant Editor
-function Editor({ note, onUpdate }) {
+function Editor({ note, onUpdate, isMobile, onBack }) {
     const [title, setTitle] = useState('');
     const [content, setContent] = useState('');
     const timeoutRef = useRef(null);
@@ -584,13 +663,24 @@ function Editor({ note, onUpdate }) {
 
     return (
         <main style={styles.editor}>
-            <div style={styles.editorHeader}>
+            <div style={{
+                ...styles.editorHeader,
+                padding: isMobile ? '1rem 1rem 0.5rem' : '2rem 3rem 1rem'
+            }}>
+                {isMobile && (
+                    <button onClick={onBack} style={styles.backButton}>
+                        ← Retour
+                    </button>
+                )}
                 <input 
                     type="text"
                     value={title}
                     onChange={handleTitleChange}
                     placeholder="Titre de la note..."
-                    style={styles.editorTitle}
+                    style={{
+                        ...styles.editorTitle,
+                        fontSize: isMobile ? '1.5rem' : '2rem'
+                    }}
                 />
                 <div style={styles.editorMeta}>
                     Modifiée: {new Date(note.updatedAt).toLocaleString('fr-FR')}
@@ -601,10 +691,17 @@ function Editor({ note, onUpdate }) {
                 value={content}
                 onChange={handleContentChange}
                 placeholder="Commencez à écrire votre note..."
-                style={styles.editorTextarea}
+                style={{
+                    ...styles.editorTextarea,
+                    padding: isMobile ? '1rem' : '2rem 3rem',
+                    fontSize: isMobile ? '0.95rem' : '1.05rem'
+                }}
             />
             
-            <div style={styles.editorFooter}>
+            <div style={{
+                ...styles.editorFooter,
+                padding: isMobile ? '0.8rem 1rem' : '1rem 3rem'
+            }}>
                 <div style={styles.wordCount}>
                     {content.split(/\s+/).filter(w => w.length > 0).length} mots
                     {' · '}
@@ -645,6 +742,53 @@ const styles = {
         backdropFilter: 'blur(10px)',
         borderBottom: '2px solid #f39c12',
         boxShadow: '0 4px 20px rgba(243, 156, 18, 0.2)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50,
+    },
+    hamburger: {
+        background: 'none',
+        border: 'none',
+        color: '#f39c12',
+        fontSize: '1.8rem',
+        cursor: 'pointer',
+        padding: '0.5rem',
+        marginRight: '0.5rem',
+        lineHeight: 1,
+    },
+    sidebarHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '1rem 1.5rem',
+        borderBottom: '2px solid rgba(243, 156, 18, 0.2)',
+    },
+    sidebarTitle: {
+        fontSize: '1.3rem',
+        fontWeight: 'bold',
+        color: '#f39c12',
+        margin: 0,
+    },
+    closeButton: {
+        background: 'none',
+        border: 'none',
+        color: '#e74c3c',
+        fontSize: '1.5rem',
+        cursor: 'pointer',
+        padding: '0.5rem',
+        lineHeight: 1,
+    },
+    backButton: {
+        background: 'none',
+        border: '2px solid rgba(243, 156, 18, 0.5)',
+        color: '#f39c12',
+        padding: '0.5rem 1rem',
+        borderRadius: '8px',
+        cursor: 'pointer',
+        marginBottom: '1rem',
+        fontSize: '0.9rem',
+        fontFamily: 'Courier New, monospace',
+        transition: 'all 0.3s ease',
     },
     headerLeft: {
         display: 'flex',
@@ -758,6 +902,7 @@ const styles = {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
+        transition: 'transform 0.3s ease',
     },
     createButton: {
         margin: '1.5rem',
