@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>NotesFlow - Prise de Notes Offline</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/png" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%231a1a2e' width='100' height='100'/%3E%3Ctext y='75' font-size='80' fill='%23f39c12'%3E📝%3C/text%3E%3C/svg%3E">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #f39c12;
+            --secondary: #16213e;
+            --bg-dark: #0f0f1e;
+            --bg-card: #1a1a2e;
+            --text-light: #e8e8e8;
+            --text-muted: #a0a0a0;
+            --accent: #00d9ff;
+            --success: #2ecc71;
+            --danger: #e74c3c;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg-dark);
+            color: var(--text-light);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        #root {
+            min-height: 100vh;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-size: 1.5rem;
+            color: var(--primary);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading::after {
+            content: '...';
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">Chargement de NotesFlow</div>
+    </div>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script type="text/babel" src="app.jsx"></script>
+    
+    <script>
+        // Variable globale pour stocker l'événement d'installation
+        window.deferredPrompt = null;
+
+        // Enregistrement du Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker enregistré:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('❌ Échec de l\'enregistrement du Service Worker:', error);
+                    });
+            });
+        }
+
+        // Gestion de l'installation de la PWA
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('🎯 beforeinstallprompt déclenché');
+            // Empêcher le mini-infobar de Chrome
+            e.preventDefault();
+            // Stocker l'événement pour l'utiliser plus tard
+            window.deferredPrompt = e;
+            // Notifier React que l'installation est disponible
+            window.dispatchEvent(new CustomEvent('pwa-installable'));
+        });
+
+        // Écouter quand l'app est installée
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ PWA installée avec succès');
+            window.deferredPrompt = null;
+        });
+    </script>
+</body>
+</html>
